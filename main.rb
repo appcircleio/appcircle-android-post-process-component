@@ -58,14 +58,14 @@ apks.concat(aabs).each do |artifact_path|
     })
 end
 
-analysis_file_path = "#{ac_build_output_path}/ac_app_analysis.json"
-File.open(analysis_file_path, "w") do |f|
+post_process_output_file_path = "#{ac_build_output_path}/ac_post_process_output.json"
+File.open(post_process_output_file_path, "w") do |f|
     f.write(datas.to_json)
 end
   
 # Write Environment Variable
 open(ENV['AC_ENV_FILE_PATH'], 'a') { |f|
-    f.puts "AC_ANDROID_APP_ANALYSIS_PATH=#{analysis_file_path}"
+    f.puts "AC_ANDROID_POST_PROCESS_OUTPUT_PATH=#{post_process_output_file_path}"
 }
 
 exit 0
