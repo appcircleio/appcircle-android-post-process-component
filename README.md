@@ -1,6 +1,6 @@
-# Appcircle Android Post Process
+# Appcircle Android Post Processor
 
-This components performs necessary system operations to identify and process the output Android binary files.
+This step performs necessary system operations to identify and process the Android output binary files.
 
 Output Variables:
 - `$AC_ANDROID_POST_PROCESS_OUTPUT_PATH`: Specifies the application post process file path
