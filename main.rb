@@ -16,7 +16,7 @@ apks = Dir.glob("#{ac_build_output_path}/**/*.apk")
 aabs = Dir.glob("#{ac_build_output_path}/**/*.aab")
 
 def run_command(command)
-    puts "@[command] #{command}"
+    puts "@@[command] #{command}"
     status = nil
     stdout_str = nil
     stderr_str = nil
