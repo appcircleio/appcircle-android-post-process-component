@@ -1,4 +1,4 @@
-# Appcircle Android Post Processor
+# Appcircle Android App Post-Processor
 
 This step performs necessary system operations to identify and process the Android output binary files.
 
