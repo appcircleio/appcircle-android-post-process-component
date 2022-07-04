@@ -35,7 +35,14 @@ def run_command(command)
     return stdout_str
 end
 
-def is_signed(meta_files) 
+def is_signed(meta_files, path)
+    v2_signed = false
+    begin
+      v2_signed = run_command("apksigner verify --verbose #{path} | head -1").include?('Verifies')
+    rescue StandardError
+      v2_signed = false
+    end
+    return true if v2_signed
     meta_files.each do |file| 
         if file.downcase.include?(".dsa") || file.downcase.include?(".rsa")
             return true
@@ -53,7 +60,7 @@ apks.concat(aabs).each do |artifact_path|
     base_name = File.basename(artifact_path)
     meta_files = filter_meta_files(artifact_path)
     datas.push({
-        "signed": is_signed(meta_files),
+        "signed": is_signed(meta_files,artifact_path),
         "app_name": base_name
     })
 end
