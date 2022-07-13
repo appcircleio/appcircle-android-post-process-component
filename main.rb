@@ -38,7 +38,7 @@ end
 def is_signed(meta_files, path)
     v2_signed = false
     begin
-      v2_signed = run_command("apksigner verify --verbose #{path} | head -1").include?('Verifies')
+      v2_signed = run_command("#{$latest_build_tools}/apksigner verify --verbose #{path} | head -1").include?('Verifies')
     rescue StandardError
       v2_signed = false
     end
