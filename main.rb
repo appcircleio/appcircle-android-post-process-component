@@ -38,7 +38,7 @@ end
 def is_signed(meta_files, path)
     v2_signed = false
     begin
-      v2_signed = run_command("#{$latest_build_tools}/apksigner verify --verbose #{path} | head -1").include?('Verifies')
+      v2_signed = run_command("#{$latest_build_tools}/apksigner verify --verbose \"#{path}\" | head -1").include?('Verifies')
     rescue StandardError
       v2_signed = false
     end
@@ -52,7 +52,7 @@ def is_signed(meta_files, path)
 end
 
 def filter_meta_files(path) 
-    return run_command("#{$latest_build_tools}/aapt ls #{path} | grep META-INF").split("\n")
+    return run_command("#{$latest_build_tools}/aapt ls \"#{path}\" | grep META-INF").split("\n")
 end
 
 datas = []
