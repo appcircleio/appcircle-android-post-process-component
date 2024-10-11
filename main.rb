@@ -5,7 +5,12 @@ require 'fileutils'
 require 'json'
 
 def get_env_variable(key)
-	return (ENV[key] == nil || ENV[key] == "") ? nil : ENV[key]
+    return (ENV[key] == nil || ENV[key] == "") ? nil : ENV[key]
+end
+
+def abort_with0(message)
+    puts "@@[error] #{message}"
+    exit 0
 end
 
 android_home = get_env_variable("ANDROID_HOME") || abort('Missing ANDROID_HOME variable.')
@@ -38,29 +43,53 @@ end
 def is_signed(meta_files, path)
     v2_signed = false
     begin
-      v2_signed = run_command("#{$latest_build_tools}/apksigner verify --verbose \"#{path}\" | head -1").include?('Verifies')
+        puts "Verifying APK signature for: #{path}"
+        v2_signed = run_command("#{$latest_build_tools}/apksigner verify --verbose \"#{path}\" | head -1").include?('Verifies')
     rescue StandardError
-      v2_signed = false
+        puts "Unable to verify v2 signature. Skipping v2 verification."
+        v2_signed = false
     end
     return true if v2_signed
+
+    puts "Scanning META-INF for DSA or RSA signature files..."
     meta_files.each do |file| 
         if file.downcase.include?(".dsa") || file.downcase.include?(".rsa")
+            puts "DSA or RSA signature files found in META-INF. The app is signed."
             return true
         end
     end
+    puts "No DSA or RSA signature files found in META-INF. The app is unsigned."
     return false
 end
 
-def filter_meta_files(path) 
-    return run_command("#{$latest_build_tools}/aapt ls \"#{path}\" | grep META-INF").split("\n")
+def filter_meta_files(path)
+    is_aapt_success = true
+    begin
+        puts "Attempting to extract META-INF files using aapt for: #{path}"
+        return run_command("#{$latest_build_tools}/aapt ls \"#{path}\" | grep META-INF").split("\n")
+    rescue StandardError
+        puts "aapt failed to open the file #{path}."
+        is_aapt_success = false
+    end
+
+    if !is_aapt_success
+        begin
+            puts "Attempting to extract META-INF files using jarsigner for: #{path}"
+            return run_command("jarsigner -verify -verbose \"#{path}\" | grep 'META-INF'").split("\n")
+        rescue StandardError => e
+            abort_with0("Both aapt and jarsigner failed to process #{path}. Error: #{e}.\n" \
+                "Automatic distribution will not proceed as the signing status of the app cannot be confirmed.")
+        end
+    end
 end
 
 datas = []
 apks.concat(aabs).each do |artifact_path|
     base_name = File.basename(artifact_path)
     meta_files = filter_meta_files(artifact_path)
+    signed = is_signed(meta_files, artifact_path)
     datas.push({
-        "signed": is_signed(meta_files,artifact_path),
+        "signed": signed,
         "app_name": base_name
     })
 end
