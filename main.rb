@@ -1,15 +1,27 @@
-require 'yaml'
 require 'open3'
-require 'find'
-require 'fileutils'
 require 'json'
+require 'colored'
 
-def get_env_variable(key)
-	return (ENV[key] == nil || ENV[key] == "") ? nil : ENV[key]
+
+def env_has_key(key)
+	return (ENV[key] != nil && ENV[key] !="") ? ENV[key] : abort("Missing #{key}.")
 end
 
-android_home = get_env_variable("ANDROID_HOME") || abort('Missing ANDROID_HOME variable.')
-ac_build_output_path = get_env_variable("AC_OUTPUT_DIR") || abort('Missing AC_OUTPUT_DIR variable.')
+def abort_with0(message)
+    puts "@@[error] #{message}"
+    exit 0
+end
+
+def get_info_msg(message)
+    puts " \n#{message.cyan}"
+end
+
+def get_warn_msg(message)
+    puts "#{message.yellow}"
+end
+
+android_home = env_has_key("ANDROID_HOME")
+ac_build_output_path = env_has_key("AC_OUTPUT_DIR")
 
 $latest_build_tools = Dir.glob("#{android_home}/build-tools/*").sort.last
 apks = Dir.glob("#{ac_build_output_path}/**/*.apk")
@@ -38,29 +50,53 @@ end
 def is_signed(meta_files, path)
     v2_signed = false
     begin
-      v2_signed = run_command("#{$latest_build_tools}/apksigner verify --verbose \"#{path}\" | head -1").include?('Verifies')
+        get_info_msg("Verifying app signature for: #{path}")
+        v2_signed = run_command("#{$latest_build_tools}/apksigner verify --verbose \"#{path}\" | head -1").include?('Verifies')
     rescue StandardError
-      v2_signed = false
+        get_warn_msg("Unable to verify v2 signature. Skipping v2 verification.")
+        v2_signed = false
     end
     return true if v2_signed
+
+    get_info_msg("Scanning META-INF for DSA or RSA signature files...")
     meta_files.each do |file| 
         if file.downcase.include?(".dsa") || file.downcase.include?(".rsa")
+            get_warn_msg("DSA or RSA signature files found in META-INF. The app is signed.")
             return true
         end
     end
+    get_warn_msg("No DSA or RSA signature files found in META-INF. The app is unsigned.")
     return false
 end
 
-def filter_meta_files(path) 
-    return run_command("#{$latest_build_tools}/aapt ls \"#{path}\" | grep META-INF").split("\n")
+def filter_meta_files(path)
+    is_aapt_success = true
+    begin
+        get_info_msg("Attempting to extract META-INF files using aapt for: #{path}")
+        return run_command("#{$latest_build_tools}/aapt ls \"#{path}\" | grep META-INF").split("\n")
+    rescue StandardError
+        get_warn_msg("aapt failed to open the file #{path}.")
+        is_aapt_success = false
+    end
+
+    if !is_aapt_success
+        begin
+            get_info_msg("Attempting to extract META-INF files using jarsigner for: #{path}")
+            return run_command("jarsigner -verify -verbose \"#{path}\" | grep 'META-INF'").split("\n")
+        rescue StandardError => e
+            abort_with0("Both aapt and jarsigner failed to process #{path}. Error: #{e}.\n" \
+                "Automatic distribution will not proceed as the signing status of the app cannot be confirmed.").red
+        end
+    end
 end
 
 datas = []
 apks.concat(aabs).each do |artifact_path|
     base_name = File.basename(artifact_path)
     meta_files = filter_meta_files(artifact_path)
+    signed = is_signed(meta_files, artifact_path)
     datas.push({
-        "signed": is_signed(meta_files,artifact_path),
+        "signed": signed,
         "app_name": base_name
     })
 end
@@ -70,7 +106,6 @@ File.open(post_process_output_file_path, "w") do |f|
     f.write(datas.to_json)
 end
   
-# Write Environment Variable
 open(ENV['AC_ENV_FILE_PATH'], 'a') { |f|
     f.puts "AC_ANDROID_POST_PROCESS_OUTPUT_PATH=#{post_process_output_file_path}"
 }
